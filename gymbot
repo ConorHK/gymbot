@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""
+Script to book gym times
+"""
+import pickle
+import os
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+
+def get_cookies():
+    """
+    Returns cookies for login
+    :returns: login cookies
+    """
+    cookie_path = os.path.join(os.getcwd(), ".cookies")
+    if not os.path.exists(cookie_path):
+        create_login_cookie(cookie_path=cookie_path)
+
+    with open(cookie_path, "rb") as cookie_file:
+        cookies = pickle.load(cookie_file)
+    return cookies
+
+def create_login_cookie(cookie_path: str):
+    """
+    Prompts user to login and then saves the cookies to .cookies file
+    :param cookie_path: .cookies file path
+    """
+    driver = webdriver.Firefox()
+    driver.get("https://hub.ucd.ie/usis/W_HU_MENU.P_DISPLAY_MENU?p_menu=IN-HOME")
+    input("Please login in the browser window, press enter on this terminal when complete: ")
+
+    with open(cookie_path, "wb") as cookie_file:
+        pickle.dump(driver.get_cookies(), cookie_file)
+
+    driver.close()
+
+def create_driver(cookies):
+    """
+    Creates driver for booking gym time
+    :param cookies: Login cookies
+    :return: driver
+    """
+    options = Options()
+    options.headless = True
+    driver = webdriver.Firefox(options=options)
+    driver.get("https://hub.ucd.ie/usis/W_HU_MENU.P_PUBLISH?p_tag=GYMBOOK")
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+    return driver
+
+
+if __name__ == "__main__":
+    login_cookies = get_cookies()
+    browser = create_driver(cookies=login_cookies)
+    browser.close()
