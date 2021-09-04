@@ -4,8 +4,22 @@ Script to book gym times
 """
 import pickle
 import os
+import argparse
+import time
+from datetime import datetime, timedelta
 from selenium import webdriver
+from selenium.webdriver.firefox.webdriver import WebDriver
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import InvalidArgumentException, NoSuchElementException
+
+
+class SlotNotFoundException(Exception):
+    """
+    Exception for when a gym slot is not found on the table
+    """
+    pass
+
 
 def get_cookies():
     """
@@ -34,6 +48,7 @@ def create_login_cookie(cookie_path: str):
 
     driver.close()
 
+
 def create_driver(cookies):
     """
     Creates driver for booking gym time
@@ -49,7 +64,102 @@ def create_driver(cookies):
     return driver
 
 
+def select_gym_slot(selected_time: str, gym: str, driver: WebDriver) -> None:
+    """
+    Opens booking page for the desired gym slot
+    :param selected_time: selected gym time slot
+    :param gym: Performance/Poolside gym
+    :param driver: Webdriver
+    """
+    try:
+        row = driver.find_element_by_xpath(f"//tr[td='{selected_time}' and td='{gym}']")
+        link = row.find_element_by_partial_link_text("Book").get_attribute("href")
+        driver.get(link)
+    except NoSuchElementException as exc:
+        driver.close()
+        raise SlotNotFoundException(
+            f"Gym slot on '{selected_time}' at '{gym}' not found on table."
+        ) from exc
+
+
+def confirm_booking(driver, student_number: str):
+    """
+    Confirms booking by entering student number and pressing correct buttons
+    :param driver: WebDriver
+    :param student_number: Users student number for confirmation
+    """
+    form = driver.find_element_by_name("MEMBER_NO")
+    form.send_keys(student_number)
+    form.send_keys(Keys.ENTER)
+
+    time.sleep(5) # wait for redirect
+    button = driver.find_element_by_xpath("//*[text()='Confirm Booking']")
+    link = button.get_attribute("href")
+    driver.get(link)
+
+
+def make_parser() -> argparse.ArgumentParser:
+    """
+    Creates argument parser
+    :returns: argument parser
+    """
+    parser = argparse.ArgumentParser(
+        "gymbot",
+        description="Bot to book UCD gym slots",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--student_number",
+        "-s",
+        dest="student_number",
+        type=str,
+        help="Your student number",
+    )
+    parser.add_argument(
+        "--time",
+        "-t",
+        dest="time",
+        type=str,
+        help="Gymslot time in format HH:MM",
+    )
+    parser.add_argument( "--pool", dest="poolside_gym", action="store_true")
+    return parser
+
+
+def wait_until_slot_opens(gym_slot: str) -> None:
+    """
+    Sleeps script until the gym slot opens for booking
+    :param gym_slot: Desired gym slot time
+    """
+    time_now = datetime.now()
+    today = datetime.today()
+    time_obj = datetime.strptime(gym_slot, "%H:%M").time()
+    selected_time = datetime.combine(today, time_obj)
+    if selected_time <= time_now:
+        tomorrow = today + timedelta(days=1)
+        selected_time = datetime.combine(tomorrow, time_obj)
+
+    if selected_time >= time_now + timedelta(hours=3):
+        wait_until = selected_time - timedelta(hours=3)
+        print(f"waiting until: {wait_until}")
+        time.sleep((wait_until - time_now).total_seconds())
+
+
 if __name__ == "__main__":
+    cli_parser = make_parser()
+    parsed_args = cli_parser.parse_args()
+
+    if not parsed_args.student_number or not parsed_args.time:
+        raise InvalidArgumentException("--student_number and --time are required")
+
+    wait_until_slot_opens(gym_slot=parsed_args.time)
     login_cookies = get_cookies()
     browser = create_driver(cookies=login_cookies)
+    if parsed_args.poolside_gym:
+        GYM = "Poolside gym"
+    else:
+        GYM = "Performance gym"
+
+    select_gym_slot(selected_time=parsed_args.time, driver=browser, gym=GYM)
+    confirm_booking(driver=browser, student_number=parsed_args.student_number)
     browser.close()
