@@ -6,6 +6,7 @@ import pickle
 import os
 import argparse
 import time
+import pytz
 from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.firefox.webdriver import WebDriver
@@ -131,18 +132,20 @@ def wait_until_slot_opens(gym_slot: str) -> None:
     Sleeps script until the gym slot opens for booking
     :param gym_slot: Desired gym slot time
     """
-    time_now = datetime.now()
+    timezone = pytz.timezone("Europe/Dublin")
+    time_now = datetime.now(timezone)
     today = datetime.today()
     time_obj = datetime.strptime(gym_slot, "%H:%M").time()
-    selected_time = datetime.combine(today, time_obj)
+    selected_time = datetime.combine(today, time_obj).astimezone(timezone)
     if selected_time <= time_now:
         tomorrow = today + timedelta(days=1)
-        selected_time = datetime.combine(tomorrow, time_obj)
+        selected_time = datetime.combine(tomorrow, time_obj).astimezone(timezone)
 
     if selected_time >= time_now + timedelta(hours=3):
         wait_until = selected_time - timedelta(hours=3)
-        print(f"waiting until: {wait_until}")
-        time.sleep((wait_until - time_now).total_seconds())
+        wait_seconds = (wait_until - time_now).total_seconds()
+        print(f"Time now: {time_now}, waiting until: {wait_until}, total seconds: {wait_seconds}")
+        time.sleep(wait_seconds)
 
 
 if __name__ == "__main__":
