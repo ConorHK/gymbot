@@ -155,8 +155,8 @@ if __name__ == "__main__":
     if not parsed_args.student_number or not parsed_args.time:
         raise InvalidArgumentException("--student_number and --time are required")
 
-    wait_until_slot_opens(gym_slot=parsed_args.time)
     login_cookies = get_cookies()
+    wait_until_slot_opens(gym_slot=parsed_args.time)
     browser = create_driver(cookies=login_cookies)
     if parsed_args.poolside_gym:
         GYM = "Poolside gym"
