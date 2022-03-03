@@ -110,7 +110,7 @@ def make_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--student_number",
+        "--student-number",
         "-s",
         dest="student_number",
         type=str,
